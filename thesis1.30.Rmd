@@ -1,0 +1,725 @@
+---
+title: "Untitled"
+author: "Yining He"
+date: "2025-01-30"
+output: github_document
+---
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(readxl)
+
+# Load the data from the Excel file (Sheet: Race-gender)
+file_path <- "drugabuse-non hispanic.xlsx"
+data <- read_excel(file_path, sheet = "Race-gender")
+
+# Merge "Native Hawaiian or Other Pacific Islander" and "More than one race" into "Non-Hispanic Others"
+data <- data %>%
+  mutate(
+    `Single Race 6` = case_when(
+      `Single Race 6` %in% c("Native Hawaiian or Other Pacific Islander", "More than one race") ~ "Non-Hispanic Others",
+      TRUE ~ `Single Race 6`
+    )
+  ) %>%
+  group_by(Year, Substance, `Single Race 6`, Gender) %>%  # Group to aggregate deaths and population
+  summarise(
+    Death = sum(Deaths, na.rm = TRUE), 
+    Population = sum(Population, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    `Crude Rate` = ifelse(Population > 0, (Death / Population) * 100000, NA),  # Calculate new Crude Rate
+    Crude_Rate_Label = ifelse(is.na(`Crude Rate`), "NA", round(`Crude Rate`, 1)) # Label for plotting
+  )
+
+# Define the custom order for race categories
+custom_race_order <- c(
+  "American Indian or Alaska Native", 
+  "White", 
+  "Black or African American", 
+  "Hispanic", 
+  "Asian", 
+  "Non-Hispanic Others"
+)
+
+# Convert the race column to a factor with the specified order
+data$`Single Race 6` <- factor(data$`Single Race 6`, levels = custom_race_order)
+
+# Create the trend plot
+trend_plot <- ggplot(data, aes(x = Year, y = `Crude Rate`, color = Gender, group = Gender)) +
+  geom_line(size = 1.2) +  # Add lines for each gender
+  geom_point(size = 3) +   # Add points for each year
+  # Add text labels for each point showing the Crude Rate
+  geom_text(aes(label = Crude_Rate_Label), vjust = -0.8, size = 3.5) +
+  facet_grid(`Single Race 6` ~ Substance, scales = "fixed") +  # Unified Y-axis across all groups
+  scale_x_continuous(breaks = seq(2018, 2023, by = 1)) +  # Ensure X-axis shows all years
+  labs(title = "Crude Mortality Rate Trends by Substance, Race, and Gender (2018-2023)",
+       x = "Year",
+       y = "Crude Rate (Per 100,000)",
+       color = "Gender") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.text.y = element_blank(),  # Remove Y-axis labels
+    axis.ticks.y = element_blank(), # Remove Y-axis ticks
+    axis.text.x = element_text(size = 10, angle = 0),
+    axis.title.y = element_blank(), # Remove Y-axis title
+    axis.title.x = element_text(size = 12),
+    strip.text = element_text(size = 10),
+    legend.position = "bottom",
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10)
+  )
+
+# Print the plot
+print(trend_plot)
+
+# Save the plot as a PDF file
+ggsave("Race_Gender_Crude_Rate_Trends_Merged.pdf", plot = trend_plot, width = 15, height = 15, dpi = 300)
+
+```
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(readxl)
+library(ggthemes)  # For high-quality visualization
+
+# Load the data from the Excel file (Sheet: Race-gender)
+file_path <- "drugabuse-non hispanic.xlsx"
+data <- read_excel(file_path, sheet = "Race-gender")
+
+# Merge "Native Hawaiian or Other Pacific Islander" and "More than one race" into "Non-Hispanic Others"
+data <- data %>%
+  mutate(
+    `Single Race 6` = case_when(
+      `Single Race 6` %in% c("Native Hawaiian or Other Pacific Islander", "More than one race") ~ "Non-Hispanic Others",
+      TRUE ~ `Single Race 6`
+    )
+  ) %>%
+  group_by(Year, Substance, `Single Race 6`, Gender) %>%  # Aggregate deaths and population
+  summarise(
+    Death = sum(Deaths, na.rm = TRUE), 
+    Population = sum(Population, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    `Crude Rate` = ifelse(Population > 0, (Death / Population) * 100000, NA),  # Calculate new Crude Rate
+    Crude_Rate_Label = ifelse(is.na(`Crude Rate`), "", round(`Crude Rate`, 1))  # Label for plotting
+  )
+
+# Define the new custom order for race categories (from top to bottom)
+custom_race_order <- c(
+  "American Indian or Alaska Native", 
+  "Black or African American", 
+  "White", 
+  "Hispanic", 
+  "Non-Hispanic Others", 
+  "Asian"
+)
+
+# Convert the race column to a factor with the specified order
+data$`Single Race 6` <- factor(data$`Single Race 6`, levels = custom_race_order, ordered = TRUE)
+
+# Create a high-quality trend plot
+trend_plot <- ggplot(data, aes(x = Year, y = `Crude Rate`, color = Gender, group = Gender)) +
+  geom_line(size = 1.5, alpha = 0.8) +  # Smooth lines for better readability
+  geom_point(size = 2.5) +   # Moderate-sized points
+  geom_text(aes(label = Crude_Rate_Label), vjust = -0.6, size = 3.2, color = "black") +  # Readable labels
+  facet_grid(`Single Race 6` ~ Substance, scales = "free_y") +  # Allows variable y-axis scaling per facet
+  scale_x_continuous(breaks = seq(2018, 2023, by = 1)) +  # Ensure X-axis shows all years
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.1))) +  # Adjust y-axis padding
+  scale_color_manual(values = c("Male" = "#1B9E77", "Female" = "#D95F02")) +  # Colorblind-friendly palette
+  labs(
+    title = "Crude Mortality Rate Trends by Substance, Race, and Gender (2018-2023)",
+    x = "Year",
+    y = "Crude Rate (per 100,000)",
+    color = "Gender"
+  ) +
+  theme_minimal(base_size = 14) +  # Set base font size for publication
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),
+    strip.text = element_text(size = 12, face = "bold"),  # Bold facet titles
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),  # Rotate x-axis labels
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
+    legend.position = "bottom",  # Move legend below for better layout
+    legend.title = element_text(size = 14, face = "bold"),
+    legend.text = element_text(size = 12),
+    panel.grid.major = element_line(size = 0.5, color = "gray80"),  # Subtle gridlines
+    panel.grid.minor = element_blank()  # Remove minor gridlines for clarity
+  )
+
+# Print the plot
+print(trend_plot)
+
+# Save the plot as a high-resolution PDF for publication
+ggsave("Race_Gender_Crude_Rate_Trends_Publication_Ordered.pdf",
+
+plot = trend_plot, width = 16, height = 18, dpi = 600)
+```
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(readxl)
+
+# Load the data from the Excel file (Sheet: Race-gender)
+file_path <- "drugabuse-non hispanic.xlsx"
+data <- read_excel(file_path, sheet = "Race-gender")
+
+# Merge "Native Hawaiian or Other Pacific Islander" and "More than one race" into "Non-Hispanic Others"
+data <- data %>%
+  mutate(
+    `Single Race 6` = case_when(
+      `Single Race 6` %in% c("Native Hawaiian or Other Pacific Islander", "More than one race") ~ "Non-Hispanic Others",
+      TRUE ~ `Single Race 6`
+    )
+  ) %>%
+  group_by(Year, Substance, `Single Race 6`, Gender) %>%
+  summarise(
+    Death = sum(Deaths, na.rm = TRUE),
+    Population = sum(Population, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    `Crude Rate` = ifelse(Population > 0, (Death / Population) * 100000, NA)  # Calculate new Crude Rate
+  )
+
+# Reshape data to calculate Sexual Gap (Male - Female)
+sexual_gap_data <- data %>%
+  select(Year, Substance, `Single Race 6`, Gender, `Crude Rate`) %>%
+  pivot_wider(names_from = Gender, values_from = `Crude Rate`) %>%  # Convert Gender column into Male & Female columns
+  mutate(
+    Sexual_Gap = Male - Female  # Compute Sexual Gap (Male - Female)
+  ) %>%
+  filter(!is.na(Sexual_Gap))  # Remove missing values
+
+# Define the custom order for race categories (from top to bottom)
+custom_race_order <- c(
+  "American Indian or Alaska Native", 
+  "Black or African American", 
+  "White", 
+  "Hispanic", 
+  "Non-Hispanic Others", 
+  "Asian"
+)
+
+# Convert the race column to a factor with the specified order
+sexual_gap_data$`Single Race 6` <- factor(sexual_gap_data$`Single Race 6`, levels = custom_race_order)
+
+# Create the sexual gap trend plot
+sexual_gap_plot <- ggplot(sexual_gap_data, aes(x = Year, y = Sexual_Gap, color = `Single Race 6`, group = `Single Race 6`)) +
+  geom_line(size = 1.5, alpha = 0.8) +  # Smooth lines for better readability
+  geom_point(size = 2.5) +  # Moderate-sized points
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", size = 1) +  # Reference line at 0
+  facet_wrap(~Substance, scales = "free_y") +  # Separate facets for each substance
+  scale_x_continuous(breaks = seq(2018, 2023, by = 1)) +  # Ensure X-axis shows all years
+  scale_color_manual(values = c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#66A61E", "#E6AB02")) +  # Colorblind-friendly palette
+  labs(
+    title = "Sexual Gap in Crude Mortality Rate (Male - Female) by Substance and Race (2018-2023)",
+    x = "Year",
+    y = "Sexual Gap (Crude Rate Difference)",
+    color = "Race"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),
+    strip.text = element_text(size = 12, face = "bold"),  # Bold facet titles
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),  # Rotate x-axis labels
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
+    legend.position = "bottom",
+    legend.title = element_text(size = 14, face = "bold"),
+    legend.text = element_text(size = 12),
+    panel.grid.major = element_line(size = 0.5, color = "gray80"),
+    panel.grid.minor = element_blank()
+  )
+
+# Print the sexual gap plot
+print(sexual_gap_plot)
+
+# Save the plot as a high-resolution PDF
+ggsave("Sexual_Gap_Crude_Rate_Trends_Publication.pdf", 
+       plot = sexual_gap_plot, width = 12, height = 10, dpi = 600)
+
+```
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(readxl)
+library(tidyr)  # Required for pivot_wider()
+
+# Load the data from the Excel file (Sheet: Race-gender)
+file_path <- "drugabuse-non hispanic.xlsx"
+data <- read_excel(file_path, sheet = "Race-gender")
+
+# Merge "Native Hawaiian or Other Pacific Islander" and "More than one race" into "Non-Hispanic Others"
+data <- data %>%
+  mutate(
+    `Single Race 6` = case_when(
+      `Single Race 6` %in% c("Native Hawaiian or Other Pacific Islander", "More than one race") ~ "Non-Hispanic Others",
+      TRUE ~ `Single Race 6`
+    )
+  ) %>%
+  group_by(Year, Substance, `Single Race 6`, Gender) %>%
+  summarise(
+    Death = sum(Deaths, na.rm = TRUE),
+    Population = sum(Population, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    `Crude Rate` = ifelse(Population > 0, (Death / Population) * 100000, NA)  # Calculate new Crude Rate
+  )
+
+# Reshape data to calculate Sexual Gap (Male - Female)
+sexual_gap_data <- data %>%
+  select(Year, Substance, `Single Race 6`, Gender, `Crude Rate`) %>%
+  pivot_wider(names_from = Gender, values_from = `Crude Rate`) %>%  # Convert Gender column into Male & Female columns
+  mutate(
+    Sexual_Gap = Male - Female  # Compute Sexual Gap (Male - Female)
+  ) %>%
+  filter(!is.na(Sexual_Gap))  # Remove missing values
+
+# Define the custom order for race categories (from top to bottom)
+custom_race_order <- c(
+  "American Indian or Alaska Native", 
+  "Black or African American", 
+  "White", 
+  "Hispanic", 
+  "Non-Hispanic Others", 
+  "Asian"
+)
+
+# Convert the race column to a factor with the specified order
+sexual_gap_data$`Single Race 6` <- factor(sexual_gap_data$`Single Race 6`, levels = custom_race_order)
+
+# Create the sexual gap trend plot
+sexual_gap_plot <- ggplot(sexual_gap_data, aes(x = Year, y = Sexual_Gap, color = `Single Race 6`, group = `Single Race 6`)) +
+  geom_line(size = 1.5, alpha = 0.8) +  # Smooth lines for better readability
+  geom_point(size = 3) +  # Moderate-sized points
+  geom_text(aes(label = round(Sexual_Gap, 1)), vjust = -0.6, size = 3.5, color = "black") +  # Label with values
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", size = 1) +  # Reference line at 0
+  facet_wrap(~Substance, scales = "free_y") +  # Separate facets for each substance
+  scale_x_continuous(breaks = seq(2018, 2023, by = 1)) +  # Ensure X-axis shows all years
+  scale_color_manual(values = c("#1B9E77", "#D95F02", "#7570B3", "#E7298A", "#66A61E", "#E6AB02")) +  # Colorblind-friendly palette
+  labs(
+    title = "Sexual Gap in Crude Mortality Rate (Male - Female) by Substance and Race (2018-2023)",
+    x = "Year",
+    y = "Sexual Gap (Crude Rate Difference)",
+    color = "Race"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),
+    strip.text = element_text(size = 12, face = "bold"),  # Bold facet titles
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),  # Rotate x-axis labels
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
+    legend.position = "bottom",
+    legend.title = element_text(size = 14, face = "bold"),
+    legend.text = element_text(size = 12),
+    panel.grid.major = element_line(size = 0.5, color = "gray80"),
+    panel.grid.minor = element_blank()
+  )
+
+# Print the sexual gap plot
+print(sexual_gap_plot)
+
+# Save the plot as a high-resolution PDF
+ggsave("Sexual_Gap_Crude_Rate_Trends_Publication2.pdf", 
+       plot = sexual_gap_plot, width = 18, height = 12, dpi = 600)
+
+```
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(readxl)
+library(tidyr)  # Required for pivot_wider()
+
+# Load the data from the Excel file (Sheet: Race-gender)
+file_path <- "drugabuse-non hispanic.xlsx"
+data <- read_excel(file_path, sheet = "Race-gender")
+
+# Merge "Native Hawaiian or Other Pacific Islander" and "More than one race" into "Non-Hispanic Others"
+data <- data %>%
+  mutate(
+    `Single Race 6` = case_when(
+      `Single Race 6` %in% c("Native Hawaiian or Other Pacific Islander", "More than one race") ~ "Non-Hispanic Others",
+      TRUE ~ `Single Race 6`
+    )
+  ) %>%
+  group_by(Year, Substance, `Single Race 6`, Gender) %>%
+  summarise(
+    Death = sum(Deaths, na.rm = TRUE),
+    Population = sum(Population, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    `Crude Rate` = ifelse(Population > 0, (Death / Population) * 100000, NA)  # Calculate new Crude Rate
+  )
+
+# Reshape data to calculate Sexual Gap (Male - Female)
+sexual_gap_data <- data %>%
+  select(Year, Substance, `Single Race 6`, Gender, `Crude Rate`) %>%
+  pivot_wider(names_from = Gender, values_from = `Crude Rate`) %>%  # Convert Gender column into Male & Female columns
+  mutate(
+    Sexual_Gap = round(Male - Female, 5)  # Compute Sexual Gap (Male - Female) and round to 5 decimal places
+  ) %>%
+  filter(!is.na(Sexual_Gap))  # Remove missing values
+
+# Save the Sexual Gap data as a CSV file
+write.csv(sexual_gap_data, "Sexual_Gap_Crude_Rate.csv", row.names = FALSE)
+
+# Display the first few rows of the table for preview
+head(sexual_gap_data)
+
+```
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(readxl)
+
+# Load the data from the Excel file (Sheet: Whole-Gender)
+file_path <- "Whole population.xlsx"
+data <- read_excel(file_path, sheet = "Whole-Gender")
+
+# Ensure Crude Rate and Year are numeric
+data <- data %>%
+  mutate(
+    `Crude Rate` = as.numeric(`Crude Rate`),  # Convert Crude Rate to numeric
+    Year = as.numeric(Year)  # Convert Year to numeric
+  )
+
+# Filter data for 2018-2023
+data_filtered <- data %>%
+  filter(Year >= 2018 & Year <= 2023) %>%
+  mutate(
+    Gender = as.factor(Gender),
+    Substance = as.factor(Substance),
+    Crude_Rate_Label = ifelse(!is.na(`Crude Rate`), round(`Crude Rate`, 2), NA)  # Handle NA values properly
+  )
+
+# Define color palette for gender
+gender_colors <- c("Male" = "#1B9E77", "Female" = "#D95F02")  # Colorblind-friendly
+
+# Create a trend plot for Crude Rate over time, faceted by Substance
+trend_plot <- ggplot(data_filtered, aes(x = Year, y = `Crude Rate`, color = Gender, group = Gender)) +
+  geom_line(size = 1.5) +  # Line plot
+  geom_point(size = 3) +   # Add points at each year
+  geom_text(aes(label = Crude_Rate_Label), vjust = -0.8, size = 3.5, color = "black", na.rm = TRUE) +  # Add labels
+  facet_wrap(~Substance, scales = "free_y", ncol = 3) +  # Facet by Substance (3 per row)
+  scale_x_continuous(breaks = seq(2018, 2023, by = 1)) +  # Ensure x-axis is numeric and shows all years
+  scale_color_manual(values = gender_colors) +  # Assign colors to Gender
+  labs(
+    title = "Crude Mortality Rate Trends by Gender and Substance (2018-2023)",
+    x = "Year",
+    y = "Crude Rate (per 100,000)",
+    color = "Gender"
+  ) +
+  theme_minimal(base_size = 14) +  # Minimal theme for publication
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),
+    strip.text = element_text(size = 12, face = "bold"),  # Bold facet titles
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),  # Rotate x-axis labels
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
+    legend.position = "bottom",
+    legend.title = element_text(size = 14, face = "bold"),
+    legend.text = element_text(size = 12),
+    panel.grid.major = element_line(size = 0.5, color = "gray80"),
+    panel.grid.minor = element_blank()
+  )
+
+# Print the trend plot
+print(trend_plot)
+
+# Save the plot as a high-resolution PDF for publication
+ggsave("Crude_Rate_Trends_Gender_Substance.pdf", 
+       plot = trend_plot, width = 12, height = 10, dpi = 600)
+
+```
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(readxl)
+library(tidyr)
+library(gridExtra)  # For arranging multiple plots in one figure
+
+# Load the data from the Excel file (Sheet: Whole-Gender)
+file_path <- "Whole population.xlsx"
+data <- read_excel(file_path, sheet = "Whole-Gender")
+
+# Ensure Crude Rate and Year are numeric
+data <- data %>%
+  mutate(
+    `Crude Rate` = as.numeric(`Crude Rate`),  # Convert Crude Rate to numeric
+    Year = as.numeric(Year)  # Convert Year to numeric
+  )
+
+# Filter data for 2018-2023
+data_filtered <- data %>%
+  filter(Year >= 2018 & Year <= 2023)
+
+# Reshape data to calculate Sexual Gap (Male - Female)
+sexual_gap_data <- data_filtered %>%
+  select(Year, Substance, Gender, `Crude Rate`) %>%
+  pivot_wider(names_from = Gender, values_from = `Crude Rate`) %>%  # Convert Gender column into Male & Female columns
+  mutate(
+    Sexual_Gap = Male - Female  # Compute Sexual Gap (Male - Female)
+  ) %>%
+  filter(!is.na(Sexual_Gap))  # Remove missing values
+
+# Define color for the Sexual Gap plot
+gap_color <- "#E7298A"  # Distinct color for gap trends
+
+# Generate plots for each substance
+substance_list <- unique(sexual_gap_data$Substance)  # List of substances
+plot_list <- list()  # List to store plots
+
+for (sub in substance_list) {
+  p <- ggplot(sexual_gap_data %>% filter(Substance == sub), aes(x = Year, y = Sexual_Gap)) +
+    geom_line(color = gap_color, size = 1.5) +  # Line plot
+    geom_point(size = 3) +  # Add points at each year
+    geom_text(aes(label = round(Sexual_Gap, 2)), vjust = -0.8, size = 4, color = "black") +  # Add labels
+    scale_x_continuous(breaks = seq(2018, 2023, by = 1)) +  # Ensure x-axis shows all years
+    labs(
+      title = sub,
+      x = "Year",
+      y = "Sexual Gap (Male - Female)"
+    ) +
+    theme_minimal(base_size = 14) +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+      axis.text.x = element_text(size = 12, angle = 45, hjust = 1),
+      axis.text.y = element_text(size = 12),
+      axis.title.y = element_text(size = 14),
+      axis.title.x = element_text(size = 14),
+      panel.grid.major = element_line(size = 0.5, color = "gray80"),
+      panel.grid.minor = element_blank()
+    )
+  
+  plot_list[[sub]] <- p  # Add plot to the list
+}
+
+# Arrange the six plots in a grid (2 rows, 3 columns)
+final_plot <- grid.arrange(grobs = plot_list, ncol = 3, nrow = 2, top = "Sexual Gap Trends (Male - Female) by Substance (2018-2023)")
+
+# Save the large figure as a high-resolution PDF for publication
+ggsave("Sexual_Gap_Trends_All_Substances.pdf", plot = final_plot, width = 16, height = 10, dpi = 600)
+
+```
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(readxl)
+library(tidyr)
+
+# Load the Race-Gender data
+file_path_race <- "drugabuse-non hispanic.xlsx"
+data_race <- read_excel(file_path_race, sheet = "Race-gender")
+
+# Merge "Native Hawaiian or Other Pacific Islander" and "More than one race" into "Non-Hispanic Others"
+data_race <- data_race %>%
+  mutate(
+    `Single Race 6` = case_when(
+      `Single Race 6` %in% c("Native Hawaiian or Other Pacific Islander", "More than one race") ~ "Non-Hispanic Others",
+      TRUE ~ `Single Race 6`
+    )
+  ) %>%
+  group_by(Year, Substance, `Single Race 6`, Gender) %>%
+  summarise(
+    Death = sum(Deaths, na.rm = TRUE),
+    Population = sum(Population, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(`Crude Rate` = ifelse(Population > 0, (Death / Population) * 100000, NA))
+
+# Reshape data to calculate Sexual Gap (Male - Female) for race groups
+sexual_gap_race <- data_race %>%
+  select(Year, Substance, `Single Race 6`, Gender, `Crude Rate`) %>%
+  pivot_wider(names_from = Gender, values_from = `Crude Rate`) %>%
+  mutate(Sexual_Gap = Male - Female) %>%
+  filter(!is.na(Sexual_Gap))
+
+# Load the Whole Population data
+file_path_whole <- "Whole population.xlsx"
+data_whole <- read_excel(file_path_whole, sheet = "Whole-Gender")
+
+# Ensure numeric values
+data_whole <- data_whole %>%
+  mutate(
+    `Crude Rate` = as.numeric(`Crude Rate`),
+    Year = as.numeric(Year)
+  )
+
+# Calculate Sexual Gap for Whole Population
+sexual_gap_whole <- data_whole %>%
+  select(Year, Substance, Gender, `Crude Rate`) %>%
+  pivot_wider(names_from = Gender, values_from = `Crude Rate`) %>%
+  mutate(
+    Sexual_Gap = Male - Female,
+    `Single Race 6` = "Whole Population"  # Assign Whole Population category
+  ) %>%
+  filter(!is.na(Sexual_Gap))
+
+# Combine the Whole Population and Race-specific data
+combined_data <- bind_rows(sexual_gap_race, sexual_gap_whole)
+
+# Define the custom order for race categories (including Whole Population)
+custom_race_order <- c(
+  "American Indian or Alaska Native", 
+  "Black or African American", 
+  "White", 
+  "Hispanic", 
+  "Non-Hispanic Others", 
+  "Asian",
+  "Whole Population"
+)
+
+# Convert the race column to a factor with the specified order
+combined_data$`Single Race 6` <- factor(combined_data$`Single Race 6`, levels = custom_race_order)
+
+# Define color palette (Whole Population gets a neon cyan dashed line)
+color_palette <- c(
+  "American Indian or Alaska Native" = "#1B9E77", 
+  "Black or African American" = "#D95F02", 
+  "White" = "#7570B3", 
+  "Hispanic" = "#E7298A", 
+  "Non-Hispanic Others" = "#66A61E", 
+  "Asian" = "#E6AB02",
+  "Whole Population" = "#00FFFF"  # Neon cyan color for Whole Population
+)
+
+# Create the updated sexual gap trend plot
+sexual_gap_plot <- ggplot(combined_data, aes(x = Year, y = Sexual_Gap, color = `Single Race 6`, group = `Single Race 6`)) +
+  geom_line(aes(linetype = `Single Race 6`, size = `Single Race 6`)) +  # Different sizes & linetypes
+  geom_point(size = 3) +  # Moderate-sized points
+  geom_text(aes(label = round(Sexual_Gap, 1)), vjust = -0.6, size = 3.5, color = "black") +  # Label with values
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", size = 1) +  # Reference line at 0
+  facet_wrap(~Substance, scales = "free_y") +  # Separate facets for each substance
+  scale_x_continuous(breaks = seq(2018, 2023, by = 1)) +  # Ensure X-axis shows all years
+  scale_color_manual(values = color_palette) +  # Assign colors
+  scale_linetype_manual(values = c(
+    "Whole Population" = "dashed",  # Make Whole Population dashed
+    "American Indian or Alaska Native" = "solid",
+    "Black or African American" = "solid",
+    "White" = "solid",
+    "Hispanic" = "solid",
+    "Non-Hispanic Others" = "solid",
+    "Asian" = "solid"
+  )) +
+  scale_size_manual(values = c(
+    "Whole Population" = 2.5,  # Make Whole Population line thicker
+    "American Indian or Alaska Native" = 1.5,
+    "Black or African American" = 1.5,
+    "White" = 1.5,
+    "Hispanic" = 1.5,
+    "Non-Hispanic Others" = 1.5,
+    "Asian" = 1.5
+  )) +
+  labs(
+    title = "Sexual Gap in Crude Mortality Rate (Male - Female) by Substance and Race (2018-2023)",
+    x = "Year",
+    y = "Sexual Gap (Crude Rate Difference)",
+    color = "Race"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 18, face = "bold"),
+    strip.text = element_text(size = 12, face = "bold"),  # Bold facet titles
+    axis.text.x = element_text(size = 12, angle = 45, hjust = 1),  # Rotate x-axis labels
+    axis.text.y = element_text(size = 12),
+    axis.title.y = element_text(size = 14),
+    axis.title.x = element_text(size = 14),
+    legend.position = "bottom",
+    legend.title = element_text(size = 14, face = "bold"),
+    legend.text = element_text(size = 12),
+    panel.grid.major = element_line(size = 0.5, color = "gray80"),
+    panel.grid.minor = element_blank()
+  )
+
+# Print the updated sexual gap plot
+print(sexual_gap_plot)
+
+# Save the updated plot as a high-resolution PDF
+ggsave("Sexual_Gap_Crude_Rate_Trends_With_Whole_Population.pdf", 
+       plot = sexual_gap_plot, width = 18, height = 12, dpi = 600)
+
+```
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(readxl)
+library(tidyr)
+
+# Load the Race-Gender data
+file_path_race <- "drugabuse-non hispanic.xlsx"
+data_race <- read_excel(file_path_race, sheet = "Race-gender")
+
+# Merge "Native Hawaiian or Other Pacific Islander" and "More than one race" into "Non-Hispanic Others"
+data_race <- data_race %>%
+  mutate(
+    `Single Race 6` = case_when(
+      `Single Race 6` %in% c("Native Hawaiian or Other Pacific Islander", "More than one race") ~ "Non-Hispanic Others",
+      TRUE ~ `Single Race 6`
+    )
+  ) %>%
+  group_by(Year, Substance, `Single Race 6`, Gender) %>%
+  summarise(
+    Death = sum(Deaths, na.rm = TRUE),
+    Population = sum(Population, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(`Crude Rate` = ifelse(Population > 0, (Death / Population) * 100000, NA))
+
+# Reshape data to calculate Sexual Gap (Male - Female) for race groups
+sexual_gap_race <- data_race %>%
+  select(Year, Substance, `Single Race 6`, Gender, `Crude Rate`) %>%
+  pivot_wider(names_from = Gender, values_from = `Crude Rate`) %>%
+  mutate(Sexual_Gap = round(Male - Female, 5)) %>%  # Round to 5 decimal places
+  filter(!is.na(Sexual_Gap))
+
+# Load the Whole Population data
+file_path_whole <- "Whole population.xlsx"
+data_whole <- read_excel(file_path_whole, sheet = "Whole-Gender")
+
+# Ensure numeric values
+data_whole <- data_whole %>%
+  mutate(
+    `Crude Rate` = as.numeric(`Crude Rate`),
+    Year = as.numeric(Year)
+  )
+
+# Calculate Sexual Gap for Whole Population
+sexual_gap_whole <- data_whole %>%
+  select(Year, Substance, Gender, `Crude Rate`) %>%
+  pivot_wider(names_from = Gender, values_from = `Crude Rate`) %>%
+  mutate(
+    Sexual_Gap = round(Male - Female, 5),  # Round to 5 decimal places
+    `Single Race 6` = "Whole Population"  # Assign Whole Population category
+  ) %>%
+  filter(!is.na(Sexual_Gap))
+
+# Combine the Whole Population and Race-specific data
+combined_data <- bind_rows(sexual_gap_race, sexual_gap_whole)
+
+# Export the dataset as a CSV file
+write.csv(combined_data, "Sexual_Gap_Data.csv", row.names = FALSE)
+
+# Display first few rows of the dataset
+head(combined_data)
+
+```
+
